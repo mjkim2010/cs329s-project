@@ -7,7 +7,6 @@ from sklearn.svm import SVR
 from sklearn.linear_model import SGDRegressor
 import joblib
 
-
 class ImageDataset(Dataset):
     def __init__(self, imgs=None, img_fps=None):
         if imgs is not None:
@@ -48,5 +47,5 @@ def load_models(clf_fp=None):
 
 def score_image(model, clf, images):
     embeds = model(images)
-    preds = clf.predict(embeds)
+    preds = clf.predict(embeds.detach().numpy())
     return preds
