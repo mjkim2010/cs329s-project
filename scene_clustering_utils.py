@@ -7,7 +7,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 
 
 class BasicPlacesDataset(Dataset):
@@ -80,8 +80,16 @@ def extract_embeds(model_truncated, imgs, embeds_output_path='img_scene_embeds.p
 class ImageClusterer:
     def __init__(self, arch='resnet50'):
         self.model = load_pretrained_model(arch, remove_last_layer=True)
-    def __call__(self, imgs, n_clusters):
+    def __call__(self, imgs, use_dbscan=True, **params):
         embeds = extract_embeds(self.model, imgs)
-        print(embeds.shape)
-        clusters = KMeans(n_clusters, random_state=31415926, verbose=1).fit_predict(embeds)
+        if use_dbscan:
+          if 'eps' not in params:
+            raise ValueError('Missing required DBSCAN parameter eps.')
+          if 'min_samples' not in params:
+            raise ValueError('Missing required DBSCAN parameter min_samples.')
+          clusters = DBSCAN(eps=params['eps'], min_samples=params['min_samples']).fit_predict(embeds)
+        else:
+          if 'n_clusters' not in params:
+            raise ValueError('Missing required K-means parameter n_clusters.')
+          clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
         return clusters
