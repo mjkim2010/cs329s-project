@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cache import SimpleLRUCache
 import collections
 import torch
 import torchvision.models as models
@@ -11,7 +12,6 @@ from tqdm import tqdm
 from sklearn.cluster import KMeans, DBSCAN
 import numpy as np
 import hashlib
-from cache import SimpleLRUCache
 
 CACHE_MAX_SIZE = 10000
 EMBED_DIM = 2048
@@ -71,9 +71,11 @@ def load_pretrained_model(arch: str, remove_last_layer=True):
     return model
 
 class ImageClusterer:
-    def __init__(self, arch='resnet50'):
+    def __init__(self, arch='resnet50', use_cache=True):
         self.model = load_pretrained_model(arch, remove_last_layer=True)
-        self.embeds_cache = SimpleLRUCache(CACHE_MAX_SIZE)
+        self.use_cache = use_cache
+        if self.use_cache:
+            self.embeds_cache = SimpleLRUCache(CACHE_MAX_SIZE)
 
     def update_cached_embeds(self, img_fps, embeds):
         def get_img_hash(img_fp):
@@ -96,12 +98,15 @@ class ImageClusterer:
         and extract embeds as normal for other embeds.
         """
         embeds = torch.zeros(len(img_fps), EMBED_DIM)
-        noncached_idxs, noncached_hashes, embeds = self.update_cached_embeds(img_fps, embeds)
-        num_cached = len(img_fps) - len(noncached_idxs)
-        print(f'Number of cached embeds: {num_cached} ({100 * num_cached / len(img_fps)}%)')
-        if not noncached_idxs: # Everything in cache; return
-            return embeds
-        noncached_img_fps = np.array(img_fps)[noncached_idxs]
+        if self.use_cache:
+            noncached_idxs, noncached_hashes, embeds = self.update_cached_embeds(img_fps, embeds)
+            num_cached = len(img_fps) - len(noncached_idxs)
+            print(f'Number of cached embeds: {num_cached} ({100 * num_cached / len(img_fps)}%)')
+            if not noncached_idxs: # Everything in cache; return
+                return embeds
+            noncached_img_fps = np.array(img_fps)[noncached_idxs]
+        else:
+            noncached_img_fps = img_fps
 
         dataset = BasicPlacesDataset(img_fps=noncached_img_fps)
         data_loader = DataLoader(dataset, batch_size=PLACES365_BATCH_SIZE, shuffle=False)
@@ -109,19 +114,21 @@ class ImageClusterer:
         print(f'Using device \'{device}\' to extract embeds...')
         self.model = self.model.to(device)
         noncached_embeds = []
-        print('starting iteration...')
         for imgs in tqdm(data_loader):
-            print('loaded a batch.')
             imgs = imgs.to(device)
             out_embeds = self.model(imgs)
             out_embeds = out_embeds.view(*out_embeds.shape[:2])
             noncached_embeds.append(out_embeds)
         noncached_embeds = torch.cat(noncached_embeds, dim=0)
         noncached_embeds = noncached_embeds.cpu()
-        for i, (idx, img_hash) in enumerate(zip(noncached_idxs, noncached_hashes)):
-            self.embeds_cache[img_hash] = noncached_embeds[i]
-            embeds[idx] = noncached_embeds[i]
+        if self.use_cache:
+            for i, (idx, img_hash) in enumerate(zip(noncached_idxs, noncached_hashes)):
+                self.embeds_cache[img_hash] = noncached_embeds[i]
+                embeds[idx] = noncached_embeds[i]
+        else:
+            embeds = noncached_embeds
         return embeds
+
     def __call__(self, imgs, use_dbscan=True, **params):
           embeds = self.extract_embeds(imgs)
           if use_dbscan:
