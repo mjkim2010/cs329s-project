@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import collections
 import torch
 import torchvision.models as models
 from torchvision import transforms as trn
@@ -8,36 +9,44 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.cluster import KMeans, DBSCAN
+import numpy as np
+import hashlib
 
+CACHE_MAX_SIZE = 10000
+EMBED_DIM = 2048
+PLACES365_BATCH_SIZE = 128
 
 class BasicPlacesDataset(Dataset):
-  def __init__(self, imgs=None, img_fps=None):
-    if imgs is not None:
-      self.imgs = imgs
-    elif img_fps is not None:
-      self.img_fps = img_fps
-    else:
-      raise ValueError('Either imgs or img_fps must be non-null')
-    self.centre_crop = trn.Compose([
-        trn.ToTensor(),
-        trn.Resize((256,256)),
-        trn.CenterCrop(224),
-    ])
-    self.norm = trn.Compose([
-        trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
+    def __init__(self, imgs=None, img_fps=None):
+        if imgs is not None:
+            self.imgs = imgs
+        elif img_fps is not None:
+            self.img_fps = img_fps
+        else:
+            raise ValueError('Either imgs or img_fps must be non-null')
+        self.centre_crop = trn.Compose([
+            trn.ToTensor(),
+            trn.Resize((256,256)),
+            trn.CenterCrop(224),
+        ])
+        self.norm = trn.Compose([
+            trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
 
-  def __getitem__(self, idx):
-    img = self.imgs[idx] if hasattr(self, 'imgs') else Image.open(self.img_fps[idx])
-    input_img = self.centre_crop(img)
-    if input_img.shape[0] != 3: # handle greyscale images
-      input_img = torch.cat((input_img, input_img, input_img), dim=0)
-    assert(input_img.shape == (3, 224, 224))
-    input_img = self.norm(input_img)
-    return input_img
+    def __getitem__(self, idx):
+        if hasattr(self, 'imgs'):
+            img = self.imgs[idx]
+        else:
+            img = Image.open(self.img_fps[idx])
+        input_img = self.centre_crop(img)
+        if input_img.shape[0] != 3: # handle greyscale images
+            input_img = torch.cat((input_img, input_img, input_img), dim=0)
+        assert(input_img.shape == (3, 224, 224))
+        input_img = self.norm(input_img)
+        return input_img
 
-  def __len__(self):
-    return len(self.imgs)
+    def __len__(self):
+        return len(self.imgs) if hasattr(self, 'imgs') else len(self.img_fps)
 
 def load_pretrained_model(arch: str, remove_last_layer=True):
     # load the pre-trained weights
@@ -60,36 +69,87 @@ def load_pretrained_model(arch: str, remove_last_layer=True):
         model = nn.Sequential(*modules)
     return model
 
-
-def extract_embeds(model_truncated, imgs, embeds_output_path='img_scene_embeds.pt'):
-    data_loader = DataLoader(BasicPlacesDataset(imgs), batch_size=128, shuffle=False)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Using device \'{device}\' to extract embeds...')
-    model_truncated = model_truncated.to(device)
-    embeds = []
-    for imgs in tqdm(data_loader):
-        imgs = imgs.to(device)
-        out_embeds = model_truncated(imgs)
-        out_embeds = out_embeds.view(*out_embeds.shape[:2])
-        embeds.append(out_embeds)
-    embeds = torch.cat(embeds, dim=0)
-    embeds = embeds.cpu()
-    torch.save(embeds, embeds_output_path)
-    return embeds
+class SimpleLRUCache:
+    def __init__(self, maxsize):
+        self.cache = collections.OrderedDict()
+        self.cache_max_size = maxsize
+    def __len__(self):
+        return len(self.cache)
+    def __contains__(self, key):
+        return key in self.cache
+    def __getitem__(self, key):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        return self.cache[key]
+    def __setitem__(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.cache_max_size:
+            self.cache.popitem(last=False)
 
 class ImageClusterer:
     def __init__(self, arch='resnet50'):
         self.model = load_pretrained_model(arch, remove_last_layer=True)
+        self.embeds_cache = SimpleLRUCache(CACHE_MAX_SIZE)
+
+    def update_cached_embeds(self, img_fps, embeds):
+        def get_img_hash(img_fp):
+            with open(img_fp, 'rb') as f:
+                img_hash = hashlib.sha256(f.read()).hexdigest()
+            return img_hash
+        noncached_idxs, noncached_hashes = [], []
+        for idx, img_fp in enumerate(img_fps):
+            img_hash = get_img_hash(img_fp)
+            if img_hash in self.embeds_cache:
+                embeds[idx] = self.embeds_cache[img_hash]
+            else:
+                noncached_idxs.append(idx)
+                noncached_hashes.append(img_hash)
+        return noncached_idxs, noncached_hashes, embeds
+
+    def extract_embeds(self, img_fps):
+        """
+        Basic problem: I want to get cached embeds for some fps,
+        and extract embeds as normal for other embeds.
+        """
+        embeds = torch.zeros(len(img_fps), EMBED_DIM)
+        noncached_idxs, noncached_hashes, embeds = self.update_cached_embeds(img_fps, embeds)
+        num_cached = len(img_fps) - len(noncached_idxs)
+        print(f'Number of cached embeds: {num_cached} ({100 * num_cached / len(img_fps)}%)')
+        if not noncached_idxs: # Everything in cache; return
+            return embeds
+        noncached_img_fps = np.array(img_fps)[noncached_idxs]
+
+        dataset = BasicPlacesDataset(img_fps=noncached_img_fps)
+        data_loader = DataLoader(dataset, batch_size=PLACES365_BATCH_SIZE, shuffle=False)
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f'Using device \'{device}\' to extract embeds...')
+        self.model = self.model.to(device)
+        noncached_embeds = []
+        print('starting iteration...')
+        for imgs in tqdm(data_loader):
+            print('loaded a batch.')
+            imgs = imgs.to(device)
+            out_embeds = self.model(imgs)
+            out_embeds = out_embeds.view(*out_embeds.shape[:2])
+            noncached_embeds.append(out_embeds)
+        noncached_embeds = torch.cat(noncached_embeds, dim=0)
+        noncached_embeds = noncached_embeds.cpu()
+        for i, (idx, img_hash) in enumerate(zip(noncached_idxs, noncached_hashes)):
+            self.embeds_cache[img_hash] = noncached_embeds[i]
+            embeds[idx] = noncached_embeds[i]
+        return embeds
     def __call__(self, imgs, use_dbscan=True, **params):
-        embeds = extract_embeds(self.model, imgs)
-        if use_dbscan:
-          if 'eps' not in params:
-            raise ValueError('Missing required DBSCAN parameter eps.')
-          if 'min_samples' not in params:
-            raise ValueError('Missing required DBSCAN parameter min_samples.')
-          clusters = DBSCAN(eps=params['eps'], min_samples=params['min_samples']).fit_predict(embeds)
-        else:
-          if 'n_clusters' not in params:
-            raise ValueError('Missing required K-means parameter n_clusters.')
-          clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
-        return clusters
+          embeds = self.extract_embeds(imgs)
+          if use_dbscan:
+              if 'eps' not in params:
+                  raise ValueError('Missing required DBSCAN parameter eps.')
+              if 'min_samples' not in params:
+                  raise ValueError('Missing required DBSCAN parameter min_samples.')
+              clusters = DBSCAN(eps=params['eps'], min_samples=params['min_samples']).fit_predict(embeds)
+          else:
+              if 'n_clusters' not in params:
+                  raise ValueError('Missing required K-means parameter n_clusters.')
+              clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
+          return clusters
