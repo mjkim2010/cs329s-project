@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import os
+if 'x86' in os.uname().machine:
+    from sklearnex import patch_sklearn
+    patch_sklearn()
 from cache import SimpleLRUCache
 import torch
 import torchvision.models as models
@@ -69,6 +73,11 @@ def load_pretrained_model(arch: str, remove_last_layer=True):
         model = nn.Sequential(*modules)
     return model
 
+def get_img_hash(img_fp):
+    with open(img_fp, 'rb') as f:
+        img_hash = hashlib.sha256(f.read()).hexdigest()
+    return img_hash
+
 class ImageClusterer:
     def __init__(self, arch='resnet50', use_cache=True):
         self.model = load_pretrained_model(arch, remove_last_layer=True)
@@ -77,13 +86,9 @@ class ImageClusterer:
             self.embeds_cache = SimpleLRUCache(CACHE_MAX_SIZE)
 
     def update_cached_embeds(self, img_fps, embeds):
-        def get_img_hash(img_fp):
-            with open(img_fp, 'rb') as f:
-                img_hash = hashlib.sha256(f.read()).hexdigest()
-            return img_hash
         noncached_idxs, noncached_hashes = [], []
-        for idx, img_fp in enumerate(img_fps):
-            img_hash = get_img_hash(img_fp)
+        img_hashes = [get_img_hash(fp) for fp in img_fps]
+        for idx, img_hash in enumerate(img_hashes):
             if img_hash in self.embeds_cache:
                 embeds[idx] = self.embeds_cache[img_hash]
             else:
