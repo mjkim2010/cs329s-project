@@ -53,6 +53,9 @@ class IQAModel(nn.Module):
 class ImageDataset2(Dataset):
     def __init__(self, image_fps, device):
         self.image_fps = image_fps
+        self.resize = transforms.Compose([
+            transforms.Resize((768,1024)),
+        ])
         self.norm = transforms.Compose([
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
@@ -60,6 +63,7 @@ class ImageDataset2(Dataset):
 
     def __getitem__(self, idx):
         input_img = transforms.ToTensor()(io.imread(self.image_fps[idx])).to(self.device)
+        input_img = self.resize(input_img)
         if input_img.shape[0] != 3:  # handle greyscale images
             input_img = torch.cat((input_img, input_img, input_img), dim=0)
         X_b = self.norm(input_img)
@@ -73,7 +77,7 @@ class ImageDataset2(Dataset):
 def load_model(state_dict_fp, device):
     model = IQAModel()
     model.to(device)
-    model.load_state_dict(torch.load(state_dict_fp))
+    model.load_state_dict(torch.load(state_dict_fp, map_location=device))
     model.eval()
     return model
 
