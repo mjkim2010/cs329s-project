@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 from collections import OrderedDict
 
 class SimpleLRUCache:
@@ -19,3 +20,8 @@ class SimpleLRUCache:
         self.cache[key] = value
         if len(self.cache) > self.cache_max_size:
             self.cache.popitem(last=False)
+
+def get_img_hash(img_fp):
+    with open(img_fp, 'rb') as f:
+        img_hash = hashlib.sha256(f.read()).hexdigest()
+    return img_hash

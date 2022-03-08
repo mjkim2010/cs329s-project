@@ -3,7 +3,7 @@ import os
 if 'x86' in os.uname().machine:
     from sklearnex import patch_sklearn
     patch_sklearn()
-from cache import SimpleLRUCache
+from cache_utils import SimpleLRUCache, get_img_hash
 import torch
 import torchvision.models as models
 from torchvision import transforms as trn
@@ -14,7 +14,6 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.cluster import KMeans, DBSCAN
 import numpy as np
-import hashlib
 
 CACHE_MAX_SIZE = 10000
 EMBED_DIM = 2048
@@ -72,11 +71,6 @@ def load_pretrained_model(arch: str, remove_last_layer=True):
         modules = list(model.children())[:-1]
         model = nn.Sequential(*modules)
     return model
-
-def get_img_hash(img_fp):
-    with open(img_fp, 'rb') as f:
-        img_hash = hashlib.sha256(f.read()).hexdigest()
-    return img_hash
 
 class ImageClusterer:
     def __init__(self, arch='resnet50', use_cache=True):
