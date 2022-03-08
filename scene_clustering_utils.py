@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import pickle
 if 'x86' in os.uname().machine:
     from sklearnex import patch_sklearn
     patch_sklearn()
@@ -127,7 +128,7 @@ class ImageClusterer:
             embeds = noncached_embeds
         return embeds
 
-    def __call__(self, img_fps, use_dbscan=True, **params):
+    def __call__(self, img_fps, use_dbscan=True, pretrained_kmeans=None, **params):
           embeds = self.extract_embeds(img_fps)
           if use_dbscan:
               if 'eps' not in params:
@@ -138,5 +139,12 @@ class ImageClusterer:
           else:
               if 'n_clusters' not in params:
                   raise ValueError('Missing required K-means parameter n_clusters.')
-              clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
+              if pretrained_kmeans is not None:
+                  if pretrained_kmeans not in {'inside_outside'}:
+                      raise ValueError('Unexpected value for pretrained kmeans')
+                  with open(f'{pretrained_kmeans}_kmeans.p', 'rb') as f:
+                      kmeans = pickle.load(f)
+                  clusters = kmeans.predict(embeds)
+              else:
+                  clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
           return clusters
