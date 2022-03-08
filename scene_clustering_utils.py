@@ -129,8 +129,8 @@ class ImageClusterer:
             embeds = noncached_embeds
         return embeds
 
-    def __call__(self, imgs, use_dbscan=True, **params):
-          embeds = self.extract_embeds(imgs)
+    def __call__(self, img_fps, use_dbscan=True, **params):
+          embeds = self.extract_embeds(img_fps)
           if use_dbscan:
               if 'eps' not in params:
                   raise ValueError('Missing required DBSCAN parameter eps.')
