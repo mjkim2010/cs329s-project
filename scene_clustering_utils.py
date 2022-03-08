@@ -19,6 +19,7 @@ import numpy as np
 CACHE_MAX_SIZE = 10000
 EMBED_DIM = 2048
 PLACES365_BATCH_SIZE = 128
+AVAILABLE_PRETRAINED_KMEANS_MODELS = {'inside_outside'}
 
 class BasicPlacesDataset(Dataset):
     def __init__(self, imgs=None, img_fps=None):
@@ -128,23 +129,21 @@ class ImageClusterer:
             embeds = noncached_embeds
         return embeds
 
-    def __call__(self, img_fps, use_dbscan=True, pretrained_kmeans=None, **params):
-          embeds = self.extract_embeds(img_fps)
-          if use_dbscan:
-              if 'eps' not in params:
-                  raise ValueError('Missing required DBSCAN parameter eps.')
-              if 'min_samples' not in params:
-                  raise ValueError('Missing required DBSCAN parameter min_samples.')
-              clusters = DBSCAN(eps=params['eps'], min_samples=params['min_samples']).fit_predict(embeds)
-          else:
-              if 'n_clusters' not in params:
-                  raise ValueError('Missing required K-means parameter n_clusters.')
-              if pretrained_kmeans is not None:
-                  if pretrained_kmeans not in {'inside_outside'}:
-                      raise ValueError('Unexpected value for pretrained kmeans')
-                  with open(f'{pretrained_kmeans}_kmeans.p', 'rb') as f:
-                      kmeans = pickle.load(f)
-                  clusters = kmeans.predict(embeds)
-              else:
-                  clusters = KMeans(params['n_clusters'], random_state=31415926).fit_predict(embeds)
-          return clusters
+    def cluster_kmeans(self, img_fps, n_clusters=None, pretrained_kmeans=None):
+        if n_clusters is None and pretrained_kmeans is None:
+            raise ValueError('Either n_clusters or pretrained_kmeans must be non-null')
+        embeds = self.extract_embeds(img_fps)
+        if pretrained_kmeans is not None:
+            if pretrained_kmeans not in AVAILABLE_PRETRAINED_KMEANS_MODELS:
+                raise ValueError('Unexpected value for pretrained_kmeans')
+            with open(f'{pretrained_kmeans}_kmeans.p', 'rb') as f:
+                kmeans = pickle.load(f)
+            clusters = kmeans.predict(embeds)
+        else:
+            clusters = KMeans(n_clusters, random_state=31415926).fit_predict(embeds)
+        return clusters
+
+    def cluster_dbscan(self, img_fps, eps=11, min_samples=5):
+        embeds = self.extract_embeds(img_fps)
+        clusters = DBSCAN(eps, min_samples=min_samples).fit_predict(embeds)
+        return clusters
