@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from cache import SimpleLRUCache
-import collections
 import torch
 import torchvision.models as models
 from torchvision import transforms as trn

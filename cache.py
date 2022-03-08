@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+from collections import OrderedDict
 
 class SimpleLRUCache:
     def __init__(self, maxsize):
-        self.cache = collections.OrderedDict()
+        self.cache = OrderedDict()
         self.cache_max_size = maxsize
     def __len__(self):
         return len(self.cache)
