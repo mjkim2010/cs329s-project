@@ -135,7 +135,7 @@ class IQAClass:
             ratings = noncached_scores
         return ratings
 
-    def __call__(self, img_fps, image_names):
+    def __call__(self, img_fps):
         ratings = self.extract_embeds(img_fps)
         return ratings
 
