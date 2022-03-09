@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 CACHE_MAX_SIZE = 10000
-BATCH_SIZE = 16
+BATCH_SIZE = 1
 
 
 class Flatten(nn.Module):
@@ -125,7 +125,7 @@ class IQAClass:
         data_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
         print(f'Using device \'{self.device}\' to extract embeds...')
         noncached_scores = []
-        for imgs,_ in tqdm(data_loader):
+        for imgs in tqdm(data_loader):
             with torch.no_grad():
               scores = self.model.forward(imgs)
             noncached_scores.append(scores)
