@@ -51,7 +51,19 @@ def show_cluster(clusterId):
 
     imgs_with_ratings = list(zip(imgs_in_cluster, cluster_ratings[clusterId]))
     imgs_with_ratings.sort(key=lambda x: x[1], reverse=True) # sort images by decreasing quality
-    pics = ['/'+filepaths[idx] for idx, _ in imgs_with_ratings]
+    # pics = ['/'+filepaths[idx] for idx, _ in imgs_with_ratings]
+    pics = []
+    i = 0
+    while i < len(imgs_in_cluster): 
+        group = []
+        for j in range(2): # number of pics in row
+            if i+j == len(imgs_in_cluster):
+                break
+            group.append(imgs_with_ratings[i+j][0]) # idx of file
+        if group:
+            pics.append(['/'+ filepaths[idx] for idx in group])
+        i += 3
+    # pics.append(['/'+ f for f in imgs_in_cluster])
     return render_template('singleCluster.html', pics=pics)
 
 # use this route to test UI
@@ -102,9 +114,9 @@ def run_IQA():
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        if 'file' not in request.files:
-            return redirect(request.url)
-        files = request.files.getlist('file')
+        # if 'file' not in request.files:
+        #     return redirect(request.url)
+        # files = request.files.getlist('file')
 
         # reset global variables
         filepaths.clear()
@@ -112,11 +124,16 @@ def upload_file():
         global model_IQA
 
         # save uploaded images...necessary to render later
-        for f in files:
-            if f and allowed_file(f.filename):
-                filename = secure_filename(f.filename)
+        # for f in files:
+        #     if f and allowed_file(f.filename):
+        #         filename = secure_filename(f.filename)
+        #         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        #         f.save(filepath)
+        #         filepaths.append(filepath)
+        with os.scandir(app.config['UPLOAD_FOLDER']) as entries:
+            for entry in entries:
+                filename = entry.name
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                f.save(filepath)
                 filepaths.append(filepath)
         
         # run clustering
