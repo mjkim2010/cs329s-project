@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 CACHE_MAX_SIZE = 10000
-BATCH_SIZE = 1
+BATCH_SIZE = 20
 
 
 class Flatten(nn.Module):
