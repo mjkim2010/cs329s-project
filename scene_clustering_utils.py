@@ -13,7 +13,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, DBSCAN, OPTICS
 import numpy as np
 
 CACHE_MAX_SIZE = 10000
@@ -145,5 +145,5 @@ class ImageClusterer:
 
     def cluster_dbscan(self, img_fps, eps=11, min_samples=5):
         embeds = self.extract_embeds(img_fps)
-        clusters = DBSCAN(eps, min_samples=min_samples).fit_predict(embeds)
+        clusters = OPTICS(min_cluster_size=5).fit_predict(embeds)
         return clusters
