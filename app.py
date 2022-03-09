@@ -15,6 +15,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 ALLOWED_EXTENSIONS = set(['jpg', 'jpeg']) # should we add png?
 
+
+def return_app():
+  return app
+
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -80,7 +85,7 @@ def upload_file():
                 cluster_imgs[c_id] = []
             cluster_imgs[c_id].append(i)
 
-        model_IQA = IQA.IQAClass("IQAModel")
+        model_IQA = IQA.IQAClass("IQAmodel")
         ratings = model_IQA(filepaths)
         
         for c_id in cluster_imgs.keys():
