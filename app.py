@@ -121,10 +121,10 @@ def upload_file():
         #         filepaths.append(filepath)
         with os.scandir(app.config['UPLOAD_FOLDER']) as entries:
             for entry in entries:
-                filename = entry.name
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                filepaths.append(filepath)
-        
+                if entry.name != ".ipynb_checkpoints":
+                    filename = entry.name
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    filepaths.append(filepath)
         # run clustering
         clustering_method = request.form['clusteringMethod']
         if clustering_method == 'kmeans':
