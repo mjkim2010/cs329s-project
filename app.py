@@ -1,9 +1,8 @@
 import os
 from urllib import response
-from flask import Flask, jsonify, request, redirect, render_template, url_for
+from flask import Flask, request, redirect, render_template, url_for
 from scene_clustering_utils import ImageClusterer
 import IQA_model_utils as IQA
-from PIL import Image
 import numpy as np
 from torchvision import transforms
 from werkzeug.utils import secure_filename
