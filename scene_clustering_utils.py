@@ -145,5 +145,5 @@ class ImageClusterer:
 
     def cluster_dbscan(self, img_fps, eps=11, min_samples=5):
         embeds = self.extract_embeds(img_fps)
-        clusters = OPTICS(min_cluster_size=5).fit_predict(embeds)
+        clusters = OPTICS(min_samples=2).fit_predict(embeds)
         return clusters
