@@ -57,7 +57,8 @@ class ImageDataset2(Dataset):
             transforms.Resize((768,1024)),
         ])
         self.norm = transforms.Compose([
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.Scale((512, 512))
         ])
         self.device = device
 
