@@ -21,18 +21,18 @@
 
         <form class="form-signin" method="post" enctype="multipart/form-data">
             <div>
-                <input class="form-check-input" type="radio" name="clusteringMethod" value="dbscan" checked>
+                <input class="form-check-input" type="radio" name="clusteringMethod" value="dbscan" checked  onclick="hideShowSceneInput('hidden')">
                 <label class="form-check-label" for="dbscan">
                 Automatic
                 </label>
             </div>
             <div>
-            <input class="form-check-input" type="radio" name="clusteringMethod" value="kmeans">
+            <input class="form-check-input" type="radio" name="clusteringMethod" value="kmeans"  onclick="hideShowSceneInput('visible')">
             <label class="form-check-label" for="kmeans">
-                Manual 
-            </label> 
+                Manual
+            </label>
             </div>
-            <div class="input-group mb-3">
+            <div class="input-group mb-3" id="scenes-input">
                 <input type="text" class="form-control" name="n_clusters" placeholder="2" aria-label="Recipient's username" aria-describedby="basic-addon2">
                 <div class="input-group-append">
                   <span class="input-group-text" id="basic-addon2">scenes</span>
@@ -42,14 +42,14 @@
                 <input class="form-check-input" type="radio" name="clusteringMethod" value="inside_outside">
                 <label class="form-check-label" for="kmeans">
                 Inside/Outside Scenes
-                </label> 
+                </label>
             </div>
             <button type="submit" class="btn btn-outline-success btn-sm">Regroup</button>
         </form>
     </div>
-      
+
       <div class="container-fluid" >
-        
+
       {% for c_id, imgIdx in best_pics.items() if c_id%2==0 %}
           {% if c_id/2%5 == 0 %}
               <div class="row justify-content-start">
@@ -107,11 +107,16 @@
               {% endif %}
               </div>
           {% endif %}
-      {% endfor %} 
+      {% endfor %}
       </div>
 
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
-
+    <script>
+      function hideShowSceneInput(visibility) {
+        document.getElementById('scenes-input').style.visibility = visibility;
+      }
+      hideShowSceneInput('hidden');
+    </script>
   </body>
 </html>
