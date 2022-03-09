@@ -88,7 +88,7 @@ def cluster(clustering_method, n_clusters=None):
 def run_IQA():
     global model_IQA
     if not model_IQA:
-        model_IQA = IQA.IQAClass("IQAModel")
+        model_IQA = IQA.IQAClass("IQAmodel")
     ratings = model_IQA(filepaths)
 
     cluster_ratings.clear()
