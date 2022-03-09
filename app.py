@@ -51,19 +51,8 @@ def show_cluster(clusterId):
 
     imgs_with_ratings = list(zip(imgs_in_cluster, cluster_ratings[clusterId]))
     imgs_with_ratings.sort(key=lambda x: x[1], reverse=True) # sort images by decreasing quality
-    # pics = ['/'+filepaths[idx] for idx, _ in imgs_with_ratings]
-    pics = []
-    i = 0
-    while i < len(imgs_in_cluster): 
-        group = []
-        for j in range(2): # number of pics in row
-            if i+j == len(imgs_in_cluster):
-                break
-            group.append(imgs_with_ratings[i+j][0]) # idx of file
-        if group:
-            pics.append(['/'+ filepaths[idx] for idx in group])
-        i += 3
-    # pics.append(['/'+ f for f in imgs_in_cluster])
+    pics = ['/'+filepaths[idx] for idx, _ in imgs_with_ratings]
+    
     return render_template('singleCluster.html', pics=pics)
 
 # use this route to test UI
